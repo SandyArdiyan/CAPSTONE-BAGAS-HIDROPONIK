@@ -1,0 +1,32 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL") // Baris baru khusus untuk jalur tembus bikin tabel
+}
+
+// Tabel untuk mencatat historis TDS dari ESP32
+model SensorLog {
+  idLog     String   @id @default(uuid())
+  deviceId  String
+  nilai_tds Int      
+  timestamp DateTime @default(now())
+}
+
+// Tabel konfigurasi untuk logika Closed-Loop
+model DeviceConfig {
+  deviceId        String @id
+  batas_bawah_tds Int    @default(560) 
+  batas_atas_tds  Int    @default(840) 
+}
+
+// Tabel untuk mencatat riwayat pompa menyala
+model PumpLog {
+  idLog           String   @id @default(uuid())
+  deviceId        String
+  status_pompa    String   
+  timestamp_event DateTime @default(now())
+}
