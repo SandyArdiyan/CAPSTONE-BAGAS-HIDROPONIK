@@ -32,8 +32,6 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    console.log("Payload diterima di server:", body);
-
     const { batas_bawah_tds, batas_atas_tds } = body;
 
     if (batas_bawah_tds === undefined || batas_atas_tds === undefined) {
@@ -56,7 +54,6 @@ export async function POST(request) {
     return NextResponse.json({ success: true, data: updatedConfig });
   } catch (error) {
     console.error("Error Detail POST Config:", error);
-    // Mengirim pesan error asli ke response agar tampil di browser/network
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

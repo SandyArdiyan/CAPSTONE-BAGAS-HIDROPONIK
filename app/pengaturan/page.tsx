@@ -45,7 +45,7 @@ export default function Pengaturan() {
       if (json.success) {
         setStatusPesan("✅ Konfigurasi berhasil disimpan ke Database!");
       } else {
-        setStatusPesan("❌ Gagal menyimpan konfigurasi.");
+        setStatusPesan(`❌ Gagal: ${json.error || 'Terjadi kesalahan'}`);
       }
     } catch (err) {
       console.error(err);
@@ -150,7 +150,7 @@ export default function Pengaturan() {
             </div>
 
             {statusPesan && (
-              <div className="text-sm font-medium text-center p-3 rounded-lg bg-green-50 text-green-700 border border-green-200">
+              <div className={`text-sm font-medium text-center p-3 rounded-lg border ${statusPesan.includes('✅') ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
                 {statusPesan}
               </div>
             )}
