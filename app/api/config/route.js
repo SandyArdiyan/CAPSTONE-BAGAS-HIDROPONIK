@@ -24,7 +24,7 @@ export async function GET(request) {
     return NextResponse.json({ success: true, data: config });
   } catch (error) {
     console.error("Error GET Config:", error);
-    return NextResponse.json({ success: false, error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
 
@@ -32,28 +32,31 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
+    console.log("Payload diterima di server:", body);
+
     const { batas_bawah_tds, batas_atas_tds } = body;
 
     if (batas_bawah_tds === undefined || batas_atas_tds === undefined) {
-      return NextResponse.json({ error: "Batas bawah dan atas wajib diisi!" }, { status: 400 });
+      return NextResponse.json({ success: false, error: "Batas bawah dan atas wajib diisi!" }, { status: 400 });
     }
 
     const updatedConfig = await prisma.deviceConfig.upsert({
       where: { deviceId: DEVICE_ID },
       update: {
-        batas_bawah_tds: parseInt(batas_bawah_tds),
-        batas_atas_tds: parseInt(batas_atas_tds),
+        batas_bawah_tds: Number(batas_bawah_tds),
+        batas_atas_tds: Number(batas_atas_tds),
       },
       create: {
         deviceId: DEVICE_ID,
-        batas_bawah_tds: parseInt(batas_bawah_tds),
-        batas_atas_tds: parseInt(batas_atas_tds),
+        batas_bawah_tds: Number(batas_bawah_tds),
+        batas_atas_tds: Number(batas_atas_tds),
       }
     });
 
     return NextResponse.json({ success: true, data: updatedConfig });
   } catch (error) {
-    console.error("Error POST Config:", error);
-    return NextResponse.json({ success: false, error: "Internal Server Error" }, { status: 500 });
+    console.error("Error Detail POST Config:", error);
+    // Mengirim pesan error asli ke response agar tampil di browser/network
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
