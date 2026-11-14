@@ -1,41 +1,45 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-// [GET] Mengambil log riwayat pompa untuk Dashboard
+// [GET] Mengambil riwayat log pompa secara rapi (diurutkan dari yang terbaru)
 export async function GET(request) {
   try {
     const logs = await prisma.pumpLog.findMany({
       orderBy: { timestamp_event: 'desc' },
-      take: 1, // Ambil 1 status paling terakhir saja untuk indikator utama
+      take: 20 // Batasi 20 data terakhir agar ringan dan rapi
     });
+
     return NextResponse.json({ success: true, data: logs });
   } catch (error) {
-    console.error("Error GET Pump:", error);
-    return NextResponse.json({ success: false, error: "Internal Server Error" }, { status: 500 });
+    console.error("Error GET PumpLog:", error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
 
-// [POST] Menerima trigger status dari ESP32 saat pompa menyala/mati
+// [POST] Mencatat event pompa menyala/mati (dari ESP32 atau Web)
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { deviceId, status_pompa } = body;
+    const { deviceId = "ESP32-BAGAS-01", status_pompa } = body;
 
-    if (!deviceId || !status_pompa) {
-      return NextResponse.json({ error: "Data deviceId dan status_pompa wajib ada!" }, { status: 400 });
+    if (!status_pompa) {
+      return NextResponse.json({ success: false, error: "Status pompa wajib diisi!" }, { status: 400 });
     }
 
-    // Simpan status pompa (ON/OFF) ke database
     const newLog = await prisma.pumpLog.create({
       data: {
-        deviceId: String(deviceId),
-        status_pompa: String(status_pompa).toUpperCase(), // Pastikan formatnya selalu huruf besar
+        deviceId: deviceId,
+        status_pompa: status_pompa, // "ON" atau "OFF"
       }
     });
 
-    return NextResponse.json({ success: true, data: newLog }, { status: 201 });
+    return NextResponse.json({ 
+      success: true, 
+      message: `Log pompa ${status_pompa} berhasil dicatat`,
+      data: newLog 
+    });
   } catch (error) {
-    console.error("Error POST Pump:", error);
-    return NextResponse.json({ success: false, error: "Internal Server Error" }, { status: 500 });
+    console.error("Error POST PumpLog:", error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
