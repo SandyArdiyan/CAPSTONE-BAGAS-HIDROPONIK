@@ -2,13 +2,35 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 
+interface PumpLogItem {
+  idLog: string;
+  deviceId: string;
+  status_pompa: string;
+  timestamp_event: string;
+}
+
 export default function Pengaturan() {
   const [batasBawah, setBatasBawah] = useState(950);
   const [batasAtas, setBatasAtas] = useState(1050);
   const [loading, setLoading] = useState(false);
+  const [loadingPompa, setLoadingPompa] = useState(false);
   const [statusPesan, setStatusPesan] = useState("");
+  const [pumpLogs, setPumpLogs] = useState<PumpLogItem[]>([]);
 
-  // Ambil data konfigurasi saat halaman pertama kali dibuka
+  // Fungsi ambil riwayat log pompa terbaru
+  const fetchPumpLogs = async () => {
+    try {
+      const res = await fetch('/api/pump');
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setPumpLogs(json.data);
+      }
+    } catch (err) {
+      console.error("Gagal memuat riwayat pompa:", err);
+    }
+  };
+
+  // Ambil data konfigurasi & log pompa saat halaman pertama kali dibuka
   useEffect(() => {
     async function fetchConfig() {
       try {
@@ -23,9 +45,10 @@ export default function Pengaturan() {
       }
     }
     fetchConfig();
+    fetchPumpLogs();
   }, []);
 
-  // Fungsi untuk menyimpan perubahan ke database Neon
+  // Fungsi untuk menyimpan perubahan batas TDS ke database Neon
   const handleSimpan = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -55,26 +78,30 @@ export default function Pengaturan() {
     }
   };
 
-  // Fungsi untuk eksekusi pompa manual secara instan
-  const handlePompaManual = async () => {
+  // Fungsi untuk eksekusi pompa manual ("ON" atau "OFF")
+  const handlePompaManual = async (status: "ON" | "OFF") => {
+    setLoadingPompa(true);
     try {
       const res = await fetch('/api/pump', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           deviceId: "ESP32-BAGAS-01",
-          status_pompa: "ON"
+          status_pompa: status
         }),
       });
       const json = await res.json();
       if (json.success) {
-        alert("🚀 Perintah manual terkirim: Pompa diaktifkan!");
+        alert(`🚀 Perintah manual terkirim: Pompa ${status}!`);
+        fetchPumpLogs(); // Langsung perbarui tabel log di bawah
       } else {
-        alert("Gagal mengaktifkan pompa.");
+        alert(`Gagal mengubah status pompa ke ${status}.`);
       }
     } catch (err) {
       console.error(err);
-      alert("Terjadi kesalahan koneksi.");
+      alert("Terjadi kesalahan koneksi ke server.");
+    } finally {
+      setLoadingPompa(false);
     }
   };
 
@@ -165,19 +192,90 @@ export default function Pengaturan() {
           </form>
         </div>
 
-        {/* Kartu Kontrol Manual */}
-        <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-gray-100 max-w-2xl border-l-4 border-l-amber-500">
+        {/* Kartu Kontrol Manual ON & OFF */}
+        <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-gray-100 max-w-2xl border-l-4 border-l-amber-500 mb-6">
           <h3 className="text-lg font-bold text-gray-800 mb-2">⚡ Kontrol Pompa Manual</h3>
           <p className="text-sm text-gray-500 mb-6">
-            Gunakan fitur ini untuk memicu penyiraman nutrisi seketika di luar siklus otomatis.
+            Gunakan tombol di bawah untuk menyalakan atau mematikan pompa nutrisi secara manual di luar siklus otomatis.
           </p>
-          <button 
-            type="button" 
-            onClick={handlePompaManual}
-            className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-4 px-4 rounded-lg transition duration-200 shadow-md flex justify-center items-center gap-2"
-          >
-            <span className="text-xl">🚀</span> Eksekusi Nutrisi Sekarang
-          </button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button 
+              type="button" 
+              disabled={loadingPompa}
+              onClick={() => handlePompaManual("ON")}
+              className="bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-4 rounded-lg transition duration-200 shadow-md flex justify-center items-center gap-2 disabled:opacity-50"
+            >
+              <span className="text-xl">🟢</span> Nyalakan Pompa (ON)
+            </button>
+
+            <button 
+              type="button" 
+              disabled={loadingPompa}
+              onClick={() => handlePompaManual("OFF")}
+              className="bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-4 rounded-lg transition duration-200 shadow-md flex justify-center items-center gap-2 disabled:opacity-50"
+            >
+              <span className="text-xl">🔴</span> Matikan Pompa (OFF)
+            </button>
+          </div>
+        </div>
+
+        {/* Kartu Tabel Log Aktivitas Pompa */}
+        <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-gray-100 max-w-2xl">
+          <div className="flex justify-between items-center mb-4 border-b pb-2">
+            <h3 className="text-lg font-bold text-gray-800">📋 Riwayat Aktivitas Pompa</h3>
+            <button 
+              type="button" 
+              onClick={fetchPumpLogs}
+              className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-3 py-1.5 rounded-lg transition"
+            >
+              🔄 Refresh
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-gray-200 text-xs uppercase text-gray-500 bg-gray-50">
+                  <th className="py-3 px-4 rounded-tl-lg">Waktu</th>
+                  <th className="py-3 px-4">Perangkat</th>
+                  <th className="py-3 px-4 rounded-tr-lg text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 text-sm">
+                {pumpLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="py-6 text-center text-gray-400">
+                      Belum ada riwayat aktivitas pompa.
+                    </td>
+                  </tr>
+                ) : (
+                  pumpLogs.slice(0, 8).map((log) => (
+                    <tr key={log.idLog} className="hover:bg-gray-50 transition">
+                      <td className="py-3 px-4 text-gray-600">
+                        {new Date(log.timestamp_event).toLocaleString('id-ID', {
+                          day: '2-digit',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit'
+                        })}
+                      </td>
+                      <td className="py-3 px-4 font-medium text-gray-700">{log.deviceId}</td>
+                      <td className="py-3 px-4 text-center">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                          log.status_pompa === "ON" 
+                            ? "bg-green-100 text-green-700" 
+                            : "bg-red-100 text-red-700"
+                        }`}>
+                          {log.status_pompa}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </main>
 
